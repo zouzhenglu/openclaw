@@ -78,3 +78,9 @@ Returns `details.json` containing the parsed JSON (and validates against `schema
 
 - The tool is **JSON-only** and instructs the model to output only JSON (no code fences, no commentary).
 - Side effects should be handled outside this tool (e.g. approvals in Lobster) before calling tools that send messages/emails.
+
+## Bundled extension note
+
+This extension depends on Clawdbot internal modules (the embedded agent runner). It is intended to ship as a **bundled** Clawdbot extension (like `lobster`) and be enabled via `plugins.entries` + tool allowlists.
+
+It is **not** currently designed to be copied into `~/.clawdbot/extensions` as a standalone plugin directory.

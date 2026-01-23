@@ -5,8 +5,31 @@ import fs from "node:fs/promises";
 import Ajv from "ajv";
 import { Type } from "@sinclair/typebox";
 
+// NOTE: This extension is intended to be bundled with Clawdbot.
+// When running from source (tests/dev), Clawdbot internals live under src/.
+// When running from a built install, internals live under dist/ (no src/ tree).
+// So we resolve internal imports dynamically with src-first, dist-fallback.
+
 import type { ClawdbotPluginApi } from "../../../src/plugins/types.js";
-import { runEmbeddedPiAgent } from "../../../src/agents/pi-embedded-runner.js";
+
+type RunEmbeddedPiAgentFn = (params: any) => Promise<any>;
+
+async function loadRunEmbeddedPiAgent(): Promise<RunEmbeddedPiAgentFn> {
+  // Source checkout (tests/dev)
+  try {
+    const mod = await import("../../../src/agents/pi-embedded-runner.js");
+    if (typeof (mod as any).runEmbeddedPiAgent === "function") return (mod as any).runEmbeddedPiAgent;
+  } catch {
+    // ignore
+  }
+
+  // Bundled install (built)
+  const mod = await import("../../../agents/pi-embedded-runner.js");
+  if (typeof (mod as any).runEmbeddedPiAgent !== "function") {
+    throw new Error("Internal error: runEmbeddedPiAgent not available");
+  }
+  return (mod as any).runEmbeddedPiAgent;
+}
 
 function stripCodeFences(s: string): string {
   const trimmed = s.trim();
@@ -127,6 +150,8 @@ export function createLlmTaskTool(api: ClawdbotPluginApi) {
       const sessionId = `llm-task-${Date.now()}`;
       const sessionFile = path.join(tmpDir, "session.json");
 
+      const runEmbeddedPiAgent = await loadRunEmbeddedPiAgent();
+
       const result = await runEmbeddedPiAgent({
         sessionId,
         sessionFile,
@@ -140,7 +165,7 @@ export function createLlmTaskTool(api: ClawdbotPluginApi) {
         authProfileId,
         authProfileIdSource: authProfileId ? "user" : "auto",
         streamParams,
-      } as any);
+      });
 
       const text = collectText((result as any).payloads);
       if (!text) throw new Error("LLM returned empty output");
